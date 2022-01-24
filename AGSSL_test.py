@@ -4,8 +4,6 @@ import numpy as np
 from math import sqrt
 from numpy.linalg import inv, norm, eigh, slogdet
 from scipy.spatial.distance import squareform, pdist
-from sklearn.model_selection import KFold
-from sklearn.metrics import roc_auc_score, average_precision_score,  coverage_error, label_ranking_average_precision_score, label_ranking_loss
 
 eps = np.finfo(np.float).eps
 
@@ -145,7 +143,6 @@ def adaptive_neighbor(Ws, Xs, distXs, mu, gam, k, max_iter = 10):
         for i in range(num_view):
             wv.append(0.5/np.sqrt(np.sum(distXs[i]*S)))
             distX += wv[i]*distXs[i]
-#            print(wv[i]*distXs[i])
         
         distXf = mu*distX + gam/4*distf
         idx = np.argsort(distXf, 1)
@@ -218,27 +215,15 @@ def agmsl(Xs, Y, param):
 
 #%%
 drug2cui_tab = pd.read_csv('./drug2cui_tab_st.csv', header = 0, index_col = 0)
-drug2fp = pd.read_csv('./drug_FCFP4_fingerprint.csv', header = 0, index_col = 0)
+drug2fp = pd.read_csv('./drug_morgan_fingerprint.csv', header = 0, index_col = 0)
 drug2path = pd.read_csv('./drug_stitch_gsva_kegg.csv', header = 0, index_col = 0)
 
-drug2cui_tab_test = pd.read_csv('./drug2cui_tab_st_independent.csv', header = 0, index_col = 0)
-drug2fp_test = pd.read_csv('./drug_FCFP4_fingerprint_independent.csv', header = 0, index_col = 0)
-drug2path_test = pd.read_csv('./drug_stitch_gsva_kegg_independent.csv', header = 0, index_col = 0)
-
 #%%
-Ytrain = drug2cui_tab.T.to_numpy()
-X1_train = drug2fp.T.to_numpy()
-X2_train = drug2path.T.to_numpy()
-# X3_all = drug2expr.T.to_numpy()
-Xtrain = [X1_train, X2_train]
-ntrain = Ytrain.shape[1]
-
-Ytest = drug2cui_tab_test.T.to_numpy()
-X1_test = drug2fp_test.T.to_numpy()
-X2_test = drug2path_test.T.to_numpy()
-# X3_all = drug2expr.T.to_numpy()
-Xtest = [X1_test, X2_test]
-ntest = Ytest.shape[1]
+Y = drug2cui_tab.T.to_numpy()
+X1 = drug2fp.T.to_numpy()
+X2 = drug2path.T.to_numpy()
+X = [X1, X2]
+n = Y.shape[1]
 
 param = {}
 param['max_iter'] = 200
@@ -253,15 +238,8 @@ param['rho'] = 2
 
 #%%
 
-Xtrain = [np.vstack((Xtrain[i], np.ones(ntrain))) for i in range(len(Xtrain))]
-Xtest = [np.vstack((Xtest[i], np.ones(ntest))) for i in range(len(Xtest))]
+X = [np.vstack((X[i], np.ones(n))) for i in range(len(X))]
    
-Ws, O, Z, S, L, num_iter = agmsl(Xtrain, Ytrain, param)
-score = Ws[0].T@Xtest[0] + Ws[1].T@Xtest[1]
-auc = roc_auc_score(Ytest.T, score.T, average = 'samples')
-aupr = average_precision_score(Ytest.T, score.T, average = 'samples')
-co_error = coverage_error(Ytest.T, score.T)
-lrap = label_ranking_average_precision_score(Ytest.T, score.T)
-rloss = label_ranking_loss(Ytest.T, score.T)
-print(auc, aupr, co_error, lrap, rloss)
+Ws, O, Z, S, L, num_iter = agmsl(X, Y, param)
+score = Ws[0].T@X[0] + Ws[1].T@X[1]
 
